@@ -270,6 +270,10 @@ type fsLockedRepo struct {
 	configLk  sync.Mutex
 }
 
+func (fsr *fsLockedRepo) Readonly() bool {
+	return fsr.readonly
+}
+
 func (fsr *fsLockedRepo) Path() string {
 	return fsr.path
 }

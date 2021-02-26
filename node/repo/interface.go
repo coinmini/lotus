@@ -22,6 +22,7 @@ const (
 	// well as state. In the future, they may get segregated into different
 	// domains.
 	ColdBlockstore = BlockstoreDomain("cold")
+	HotBlockstore  = BlockstoreDomain("hot")
 )
 
 var (
@@ -80,4 +81,7 @@ type LockedRepo interface {
 
 	// Path returns absolute path of the repo
 	Path() string
+
+	// Readonly returns true if the repo is readonly
+	Readonly() bool
 }

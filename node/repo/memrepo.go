@@ -200,6 +200,10 @@ func (mem *MemRepo) Lock(t RepoType) (LockedRepo, error) {
 	}, nil
 }
 
+func (lmem *lockedMemRepo) Readonly() bool {
+	return false
+}
+
 func (lmem *lockedMemRepo) checkToken() error {
 	lmem.RLock()
 	defer lmem.RUnlock()

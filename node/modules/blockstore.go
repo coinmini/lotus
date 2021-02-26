@@ -3,7 +3,12 @@ package modules
 import (
 	"context"
 	"io"
+	"os"
+	"path/filepath"
+	"time"
 
+	lmdbbs "github.com/filecoin-project/go-bs-lmdb"
+	badgerbs "github.com/filecoin-project/lotus/lib/blockstore/badger"
 	bstore "github.com/ipfs/go-ipfs-blockstore"
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
@@ -32,13 +37,71 @@ func ColdBlockstore(lc fx.Lifecycle, r repo.LockedRepo) (dtypes.ColdBlockstore, 
 	return bs, err
 }
 
-func SplitBlockstore(lc fx.Lifecycle, r repo.LockedRepo, ds dtypes.MetadataDS, bs dtypes.ColdBlockstore) (dtypes.SplitBlockstore, error) {
+func LMDBHotBlockstore(lc fx.Lifecycle, r repo.LockedRepo) (dtypes.HotBlockstore, error) {
 	path, err := r.SplitstorePath()
 	if err != nil {
 		return nil, err
 	}
 
-	ss, err := splitstore.NewSplitStore(path, ds, bs)
+	path = filepath.Join(path, "hot.db")
+	bs, err := lmdbbs.Open(&lmdbbs.Options{
+		Path:                 path,
+		InitialMmapSize:      4 << 30, // 4GiB.
+		MmapGrowthStepFactor: 1.25,    // scale slower than the default of 1.5
+		MmapGrowthStepMax:    4 << 30, // 4GiB
+		RetryDelay:           10 * time.Microsecond,
+		MaxReaders:           1024,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	lc.Append(fx.Hook{
+		OnStop: func(_ context.Context) error {
+			return bs.Close()
+		}})
+
+	hot := blockstore.WrapIDStore(bs)
+	return hot, err
+}
+
+func BadgerHotBlockstore(lc fx.Lifecycle, r repo.LockedRepo) (dtypes.HotBlockstore, error) {
+	path, err := r.SplitstorePath()
+	if err != nil {
+		return nil, err
+	}
+
+	path = filepath.Join(path, "hot.bs")
+	if err := os.MkdirAll(path, 0755); err != nil {
+		return nil, err
+	}
+
+	opts, err := repo.BadgerBlockstoreOptions(repo.HotBlockstore, path, r.Readonly())
+	if err != nil {
+		return nil, err
+	}
+
+	bs, err := badgerbs.Open(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	lc.Append(fx.Hook{
+		OnStop: func(_ context.Context) error {
+			return bs.Close()
+		}})
+
+	hot := blockstore.WrapIDStore(bs)
+	return hot, err
+}
+
+func SplitBlockstore(lc fx.Lifecycle, r repo.LockedRepo, ds dtypes.MetadataDS, cold dtypes.ColdBlockstore, hot dtypes.HotBlockstore) (dtypes.SplitBlockstore, error) {
+	path, err := r.SplitstorePath()
+	if err != nil {
+		return nil, err
+	}
+
+	ss, err := splitstore.NewSplitStore(path, ds, cold, hot)
 	if err != nil {
 		return nil, err
 	}
@@ -51,13 +114,19 @@ func SplitBlockstore(lc fx.Lifecycle, r repo.LockedRepo, ds dtypes.MetadataDS, b
 	return ss, err
 }
 
-// StateBlockstore returns the blockstore to use to store the state tree.
-func StateBlockstore(lc fx.Lifecycle, mctx helpers.MetricsCtx, bs dtypes.SplitBlockstore) (dtypes.StateBlockstore, error) {
+func StateFlatBlockstore(lc fx.Lifecycle, mctx helpers.MetricsCtx, bs dtypes.ColdBlockstore) (dtypes.StateBlockstore, error) {
 	return bs, nil
 }
 
-// ChainBlockstore returns the blockstore to use for chain data (tipsets, blocks, messages).
-func ChainBlockstore(lc fx.Lifecycle, mctx helpers.MetricsCtx, bs dtypes.SplitBlockstore) (dtypes.ChainBlockstore, error) {
+func StateSplitBlockstore(lc fx.Lifecycle, mctx helpers.MetricsCtx, bs dtypes.SplitBlockstore) (dtypes.StateBlockstore, error) {
+	return bs, nil
+}
+
+func ChainFlatBlockstore(lc fx.Lifecycle, mctx helpers.MetricsCtx, bs dtypes.ColdBlockstore) (dtypes.ChainBlockstore, error) {
+	return bs, nil
+}
+
+func ChainSplitBlockstore(lc fx.Lifecycle, mctx helpers.MetricsCtx, bs dtypes.SplitBlockstore) (dtypes.ChainBlockstore, error) {
 	return bs, nil
 }
 
