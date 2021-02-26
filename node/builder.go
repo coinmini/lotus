@@ -14,6 +14,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/vm"
 	"github.com/filecoin-project/lotus/chain/wallet"
+	api2 "github.com/filecoin-project/lotus/cmd/lotus-sentinel/api"
 	"github.com/filecoin-project/lotus/node/hello"
 	"github.com/filecoin-project/lotus/system"
 
@@ -695,5 +696,22 @@ func Test() Option {
 		Unset(new(*peermgr.PeerMgr)),
 		Override(new(beacon.Schedule), testing.RandomBeacon),
 		Override(new(*storageadapter.DealPublisher), storageadapter.NewDealPublisher(nil, storageadapter.PublishMsgConfig{})),
+	)
+}
+
+// Sentinel Node settings
+func SentinelNodeAPI(out *api2.SentinelNode, fopts ...FullOption) Option {
+	return Options(
+		func(s *Settings) error {
+			s.nodeType = repo.FullNode
+			return nil
+		},
+		Options(fopts...),
+		func(s *Settings) error {
+			resAPI := &api2.SentinelNodeAPI{}
+			s.invokes[ExtractApiKey] = fx.Populate(resAPI)
+			*out = resAPI
+			return nil
+		},
 	)
 }

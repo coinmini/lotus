@@ -225,6 +225,12 @@ lotus-keygen:
 .PHONY: lotus-keygen
 BINS+=lotus-keygen
 
+lotus-sentinel: $(BUILD_DEPS)
+	rm -f lotus-sentinel
+	go build -o lotus-sentinel ./cmd/lotus-sentinel
+.PHONY: lotus-keygen
+BINS+=lotus-sentinel
+
 testground:
 	go build -tags testground -o /dev/null ./cmd/lotus
 .PHONY: testground
