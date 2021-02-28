@@ -6,22 +6,23 @@ import (
 	"github.com/filecoin-project/lotus/extern/sector-storage/storiface"
 )
 
+// 等待阶段，随时查看Resources的情况
 func (a *activeResources) withResources(id WorkerID, wr storiface.WorkerResources, r Resources, locker sync.Locker, cb func() error) error {
-	for !a.canHandleRequest(r, id, "withResources", wr) {
-		if a.cond == nil {
-			a.cond = sync.NewCond(locker)
-		}
-		a.cond.Wait()
-	}
+	// for !a.canHandleRequest(r, id, "withResources", wr) {
+	// 	if a.cond == nil {
+	// 		a.cond = sync.NewCond(locker)
+	// 	}
+	// 	a.cond.Wait()
+	// }
 
 	a.add(wr, r)
 
 	err := cb()
 
 	a.free(wr, r)
-	if a.cond != nil {
-		a.cond.Broadcast()
-	}
+	// if a.cond != nil {
+	// 	a.cond.Broadcast()
+	// }
 
 	return err
 }
